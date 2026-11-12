@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Постановка лодки</title>
+  <meta name="description" content="Сколько нажатий GPS-якоря нужно, чтобы рыба встала за кормой на 12 часов.">
+  <meta name="theme-color" content="#f4f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1720" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Постановка">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Постановка лодки</h1>
+      <span class="hint-12">12 ч — за кормой · кнопки — от носа</span>
+    </header>
+
+    <!-- Результат: сколько нажатий -->
+    <section class="result" aria-live="polite" aria-label="Что нажать на якоре">
+      <div class="cmd" id="cmd-long">
+        <div class="cmd-dir" data-dir>—</div>
+        <div class="cmd-num" data-num>0</div>
+        <div class="cmd-sub" data-sub>&nbsp;</div>
+      </div>
+      <div class="cmd" id="cmd-side">
+        <div class="cmd-dir" data-dir>—</div>
+        <div class="cmd-num" data-num>0</div>
+        <div class="cmd-sub" data-sub>&nbsp;</div>
+      </div>
+      <p class="after" id="after">&nbsp;</p>
+      <p class="error" id="error" hidden></p>
+    </section>
+
+    <!-- Где рыба: вид сверху, в центре датчик, кольца через 5 м до 30 м -->
+    <section class="card dial-card" aria-label="Где рыба">
+      <svg id="dial" class="dial" viewBox="-160 -160 320 320" role="slider" tabindex="0"
+           aria-label="Где рыба: направление по часам и расстояние" aria-valuemin="0" aria-valuemax="355"></svg>
+      <p class="dial-hint">Тап по месту — часы и метры, по цифре — только часы</p>
+      <div class="pick-row">
+        <div class="mini">
+          <span class="mini-label" id="clock-label">Рыба на, ч</span>
+          <div class="stepper">
+            <button type="button" class="step" id="clock-minus" aria-label="На 10 минут назад">−</button>
+            <output id="clock-out" class="stepper-value" aria-labelledby="clock-label">2:00</output>
+            <button type="button" class="step" id="clock-plus" aria-label="На 10 минут вперёд">+</button>
+          </div>
+        </div>
+        <div class="field mini" data-key="distance" data-step="1" data-min="1" data-max="30">
+          <label for="f-distance">До рыбы, м</label>
+          <div class="stepper">
+            <button type="button" class="step" data-delta="-1" aria-label="Ближе">−</button>
+            <input id="f-distance" inputmode="decimal" autocomplete="off" enterkeyhint="done">
+            <button type="button" class="step" data-delta="1" aria-label="Дальше">+</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Спуск лески: на каком расстоянии от кормы должна оказаться рыба -->
+    <section class="card release" aria-label="Спуск лески">
+      <div class="field" data-key="target" data-step="1" data-min="1" data-max="30">
+        <label for="f-target">Спуск лески, м от кормы</label>
+        <div class="release-row">
+          <div class="stepper">
+            <button type="button" class="step" data-delta="-1" aria-label="Ближе">−</button>
+            <input id="f-target" inputmode="decimal" autocomplete="off" enterkeyhint="done">
+            <button type="button" class="step" data-delta="1" aria-label="Дальше">+</button>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="r-target" class="slider" min="1" max="30" step="1" aria-label="Спуск лески, метров от кормы">
+            <div class="slider-scale" aria-hidden="true"><span>1 м</span><span>30 м</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Схема сверху -->
+    <section class="card" aria-label="Схема перестановки, вид сверху">
+      <h2>Схема, вид сверху</h2>
+      <svg id="plan" class="plan" role="img" aria-label="Лодка сейчас, лодка после перестановки и рыба"></svg>
+      <p class="legend">
+        <span><i class="sw sw-now"></i>сейчас</span>
+        <span><i class="sw sw-after"></i>после</span>
+        <span><i class="sw sw-fish"></i>рыба</span>
+        <span id="grid-note"></span>
+      </p>
+    </section>
+
+    <!-- Настройки -->
+    <details class="card settings">
+      <summary>Настройки якоря и датчика</summary>
+      <div class="field" data-key="stepLong" data-step="0.1" data-min="0.1" data-max="20">
+        <label for="f-stepLong">Шаг вперёд/назад, м за нажатие</label>
+        <div class="stepper">
+          <button type="button" class="step" data-delta="-1" aria-label="Меньше">−</button>
+          <input id="f-stepLong" inputmode="decimal" autocomplete="off">
+          <button type="button" class="step" data-delta="1" aria-label="Больше">+</button>
+        </div>
+      </div>
+      <div class="field" data-key="stepSide" data-step="0.1" data-min="0.1" data-max="20">
+        <label for="f-stepSide">Шаг влево/вправо, м за нажатие</label>
+        <div class="stepper">
+          <button type="button" class="step" data-delta="-1" aria-label="Меньше">−</button>
+          <input id="f-stepSide" inputmode="decimal" autocomplete="off">
+          <button type="button" class="step" data-delta="1" aria-label="Больше">+</button>
+        </div>
+      </div>
+      <div class="field" data-key="mountDeg" data-step="5" data-min="-180" data-max="180">
+        <label for="f-mountDeg">Куда смотрит датчик, ° от 12 ч</label>
+        <div class="stepper">
+          <button type="button" class="step" data-delta="-1" aria-label="Меньше">−</button>
+          <input id="f-mountDeg" inputmode="decimal" autocomplete="off">
+          <button type="button" class="step" data-delta="1" aria-label="Больше">+</button>
+        </div>
+        <p class="note">0 — часы вводятся сразу относительно лодки. Если берёте направление с экрана эхолота, а датчик повёрнут, укажите его поворот: по часовой «+», против «−». 30° = 1 час.</p>
+      </div>
+      <div class="field" data-key="sensorFwd" data-step="0.5" data-min="-20" data-max="20">
+        <label for="f-sensorFwd">Датчик ближе к носу от кормы, м</label>
+        <div class="stepper">
+          <button type="button" class="step" data-delta="-1" aria-label="Меньше">−</button>
+          <input id="f-sensorFwd" inputmode="decimal" autocomplete="off">
+          <button type="button" class="step" data-delta="1" aria-label="Больше">+</button>
+        </div>
+        <p class="note">0 — датчик у кормы. Расстояние «до рыбы сейчас» берётся с эхолота, по горизонтали.</p>
+      </div>
+      <button type="button" class="reset" id="reset">Вернуть заводские: 1 м и 1,5 м, датчик 0</button>
+    </details>
+
+    <details class="card install" id="install">
+      <summary>Установить на телефон</summary>
+      <button type="button" class="install-btn" id="install-btn" hidden>Установить приложение</button>
+      <p><b>iPhone:</b> откройте в Safari → кнопка «Поделиться» → «На экран „Домой“».</p>
+      <p><b>Android:</b> откройте в Chrome → меню ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
+      <p>После первого открытия приложение работает без интернета.</p>
+    </details>
+
+    <footer class="foot">
+      <span id="offline-status">Проверяю работу без интернета…</span>
+      <span id="version"></span>
+    </footer>
+  </main>
+</body>
+</html>
